@@ -1,0 +1,85 @@
+version: '3'
+services:
+  mysql_master:
+    image: mysql:8.0
+    env_file:
+      - ./storage/master/.env
+    container_name: "mysql_master"
+    restart: "no"
+    ports:
+      - 3306:3306
+    volumes:
+      - ./storage/master/conf/conf.cnf:/etc/mysql/conf.d/mysql.conf.cnf
+      - ./storage/master/data:/var/lib/mysql
+    networks:
+      example:
+        ipv4_address: 10.10.0.6
+
+  mysql_slave_1:
+    image: mysql:8.0
+    env_file:
+      - ./storage/slave_1/.env
+    container_name: "mysql_slave_1"
+    restart: "no"
+    ports:
+      - 3307:3306
+    depends_on:
+      - mysql_master
+    volumes:
+      - ./storage/slave_1/conf/conf.cnf:/etc/mysql/conf.d/mysql.conf.cnf
+      - ./storage/slave_1/data:/var/lib/mysql
+    networks:
+      example:
+        ipv4_address: 10.10.0.3
+
+  mysql_slave_2:
+    image: mysql:8.0
+    env_file:
+      - ./storage/slave_2/.env
+    container_name: "mysql_slave_2"
+    restart: "no"
+    ports:
+      - 3308:3306
+    depends_on:
+      - mysql_master
+    volumes:
+      - ./storage/slave_2/conf/conf.cnf:/etc/mysql/conf.d/mysql.conf.cnf
+      - ./storage/slave_2/data:/var/lib/mysql
+    networks:
+      example:
+        ipv4_address: 10.10.0.4
+
+  haproxy:
+    image: haproxytech/haproxy-ubuntu:latest
+    container_name: haproxy
+    restart: unless-stopped
+    depends_on:
+      - mysql_master
+    ports: 
+      - "2999:2999"
+    volumes:
+      - ./loadbalance/conf/haproxy.cfg:/etc/haproxy/haproxy.cfg
+    networks:
+      example:
+        ipv4_address: 10.10.0.7
+  php-app:
+    build:
+      context: .
+      dockerfile: PHPDockerfile
+    container_name: php-app
+    volumes:
+      - ./app:/var/www/html
+    command: "php -S 0.0.0.0:80 -t /var/www/html"
+    ports:
+      - "90:80"
+    networks:
+      example:
+        ipv4_address: 10.10.0.5
+
+networks:
+  example:
+    driver: bridge
+    ipam:
+     config:
+       - subnet: 10.10.0.0/24
+         gateway: 10.10.0.1
